@@ -111,7 +111,7 @@ typedef enum {
         currentVC.view.frame = CGRectOffset(self.view.bounds, self.view.bounds.size.width, 0);
         CGAffineTransform transf = CGAffineTransformIdentity;
         previousVC.view.transform = CGAffineTransformScale(transf, 1.0, 1.0);
-        previousVCs.view.frame = self.view.bounds;
+        previousVC.view.frame = self.view.bounds;
         _blackMask.alpha = 0.0;
     } completion:^(BOOL finished) {
         if (finished) {
