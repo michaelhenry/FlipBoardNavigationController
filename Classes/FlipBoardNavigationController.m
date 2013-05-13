@@ -9,10 +9,10 @@
 #import "FlipBoardNavigationController.h"
 #import <QuartzCore/QuartzCore.h>
 
-const CGFloat kAnimationDuration = 0.5f;
-const CGFloat kAnimationDelay = 0;
-const CGFloat kOffsetTrigger = 3.0;
-const CGFloat kMaxBlackMaskAlpha = 0.8f;
+static const CGFloat kAnimationDuration = 0.5f;
+static const CGFloat kAnimationDelay = 0;
+static const CGFloat kOffsetTrigger = 3.0;
+static const CGFloat kMaxBlackMaskAlpha = 0.8f;
 
 
 typedef enum {
