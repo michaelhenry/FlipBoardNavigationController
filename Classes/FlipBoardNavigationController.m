@@ -8,12 +8,11 @@
 
 #import "FlipBoardNavigationController.h"
 #import <QuartzCore/QuartzCore.h>
-#import <objc/runtime.h>
 
-#define ANIMATION_DURATION 0.5f
-#define ANIMATION_DELAY 0
-#define OFFSET_TRIGGER 3.0
-#define MAX_BLACK_MASK_ALPHA 0.8f
+static const CGFloat kAnimationDuration = 0.5f;
+static const CGFloat kAnimationDelay = 0;
+static const CGFloat kOffsetTrigger = 3.0;
+static const CGFloat kMaxBlackMaskAlpha = 0.8f;
 
 
 typedef enum {
@@ -44,11 +43,6 @@ typedef enum {
 - (id) initWithRootViewController:(UIViewController*)rootViewController {
     if (self = [super init]) {
         self.viewControllers = [NSMutableArray arrayWithObject:rootViewController];
-        rootViewController.flipboardNavigationController =  self;
-        UIView * rootView = rootViewController.view;
-        CGSize viewSize = self.view.frame.size;
-        rootView.frame = CGRectMake(0.0f, 0.0f, viewSize.width, viewSize.height);
-        [self.view addSubview:rootView];
     }
     return self;
 }
@@ -61,7 +55,14 @@ typedef enum {
 
 - (void) loadView {
     [super loadView];
+    UIViewController *rootViewController = [self.viewControllers objectAtIndex:0];
+    [rootViewController willMoveToParentViewController:self];
+    [self addChildViewController:rootViewController];
+    UIView * rootView = rootViewController.view;
     CGSize viewSize = self.view.frame.size;
+    rootView.frame = CGRectMake(0.0f, 0.0f, viewSize.width, viewSize.height);
+    [self.view addSubview:rootView];
+    [rootViewController didMoveToParentViewController:self];
     _blackMask = [[UIView alloc] initWithFrame:CGRectMake(0.0f, 0.0f, viewSize.width, viewSize.height)];
     _blackMask.backgroundColor = [UIColor blackColor];
     _blackMask.alpha = 0.0;
@@ -72,18 +73,20 @@ typedef enum {
 - (void) pushViewController:(UIViewController *)viewController completion:(FlipBoardNavigationControllerCompletionBlock)handler {
     _animationInProgress = YES;
     viewController.view.frame = CGRectOffset(self.view.bounds, self.view.bounds.size.width, 0);
-    viewController.flipboardNavigationController = self;
     _blackMask.alpha = 0.0;
+    [viewController willMoveToParentViewController:self];
+    [self addChildViewController:viewController];
     [self.view bringSubviewToFront:_blackMask];
     [self.view addSubview:viewController.view];
-    [UIView animateWithDuration:ANIMATION_DURATION delay:ANIMATION_DELAY options:0 animations:^{
+    [UIView animateWithDuration:kAnimationDuration delay:kAnimationDelay options:0 animations:^{
         CGAffineTransform transf = CGAffineTransformIdentity;
         [self currentViewController].view.transform = CGAffineTransformScale(transf, 0.9f, 0.9f);
         viewController.view.frame = self.view.bounds;
-        _blackMask.alpha = MAX_BLACK_MASK_ALPHA;
+        _blackMask.alpha = kMaxBlackMaskAlpha;
     }   completion:^(BOOL finished) {
         if (finished) {
             [self.viewControllers addObject:viewController];
+            [viewController didMoveToParentViewController:self];
             _animationInProgress = NO;
             _gestures = [[NSMutableArray alloc] init];
             [self addPanGestureToView:[self currentViewController].view];
@@ -102,17 +105,21 @@ typedef enum {
     if (self.viewControllers.count < 2) {
         return;
     }
-    
-    [UIView animateWithDuration:ANIMATION_DURATION delay:ANIMATION_DELAY options:0 animations:^{
-        [self currentViewController].view.frame = CGRectOffset(self.view.bounds, self.view.bounds.size.width, 0);
+    UIViewController *currentVC = [self currentViewController];
+    UIViewController *previousVC = [self previousViewController];
+    [UIView animateWithDuration:kAnimationDuration delay:kAnimationDelay options:0 animations:^{
+        currentVC.view.frame = CGRectOffset(self.view.bounds, self.view.bounds.size.width, 0);
         CGAffineTransform transf = CGAffineTransformIdentity;
-        [self previousViewController].view.transform = CGAffineTransformScale(transf, 1.0, 1.0);
-        [self previousViewController].view.frame = self.view.bounds;
+        previousVC.view.transform = CGAffineTransformScale(transf, 1.0, 1.0);
+        previousVC.view.frame = self.view.bounds;
         _blackMask.alpha = 0.0;
     } completion:^(BOOL finished) {
         if (finished) {
+            [currentVC willMoveToParentViewController:nil];
             [self.view bringSubviewToFront:[self previousViewController].view];
-            [self.viewControllers removeLastObject];
+            [currentVC removeFromParentViewController];
+            [currentVC didMoveToParentViewController:nil];
+            [self.viewControllers removeObject:currentVC];
             _animationInProgress = NO;
             handler();
         }
@@ -131,11 +138,11 @@ typedef enum {
     UIViewController * nvc = [self previousViewController];
     CGRect rect = CGRectMake(0, 0, vc.view.frame.size.width, vc.view.frame.size.height);
     self.view.transform = self.view.transform;
-    [UIView animateWithDuration:((vc.view.frame.origin.x *ANIMATION_DURATION)/self.view.frame.size.width) delay:ANIMATION_DELAY options:0 animations:^{
+    [UIView animateWithDuration:((vc.view.frame.origin.x *kAnimationDuration)/self.view.frame.size.width) delay:kAnimationDelay options:0 animations:^{
         CGAffineTransform transf = CGAffineTransformIdentity;
         nvc.view.transform = CGAffineTransformScale(transf, 0.9f, 0.9f);
         vc.view.frame = rect;
-        _blackMask.alpha = MAX_BLACK_MASK_ALPHA;
+        _blackMask.alpha = kMaxBlackMaskAlpha;
     }   completion:^(BOOL finished) {
         if (finished) {
             _animationInProgress = NO;
@@ -205,7 +212,7 @@ typedef enum {
     
     CGAffineTransform transf = CGAffineTransformIdentity;
     CGFloat newTransformValue =  1 - (offset/(self.view.frame.size.width/10))/100;
-    CGFloat newAlphaValue = (offset/self.view.frame.size.width)* MAX_BLACK_MASK_ALPHA;
+    CGFloat newAlphaValue = (offset/self.view.frame.size.width)* kMaxBlackMaskAlpha;
     
     [self previousViewController].view.transform = CGAffineTransformScale(transf,newTransformValue,newTransformValue);
     
@@ -251,21 +258,22 @@ typedef enum {
 #pragma mark - UIViewController Category
 //For Global Access of flipViewController
 @implementation UIViewController (FlipBoardNavigationController)
-static char flipboardNavigationControllerKey;
+@dynamic flipboardNavigationController;
 
-- (void) setFlipboardNavigationController:(FlipBoardNavigationController *)flipboardNavigationController {
-    [self willChangeValueForKey:@"flipboardNavigationController"];
-    objc_setAssociatedObject( self,
-                             &flipboardNavigationControllerKey,
-                             flipboardNavigationController,
-                             OBJC_ASSOCIATION_RETAIN );
+- (FlipBoardNavigationController *)flipboardNavigationController
+{
     
-    [self didChangeValueForKey:@"flipboardNavigationController"];
+    if([self.parentViewController isKindOfClass:[FlipBoardNavigationController class]]){
+        return (FlipBoardNavigationController*)self.parentViewController;
+    }
+    else if([self.parentViewController isKindOfClass:[UINavigationController class]] &&
+            [self.parentViewController.parentViewController isKindOfClass:[FlipBoardNavigationController class]]){
+        return (FlipBoardNavigationController*)[self.parentViewController parentViewController];
+    }
+    else{
+        return nil;
+    }
+    
 }
 
-- (FlipBoardNavigationController*) flipboardNavigationController {
-    id controller = objc_getAssociatedObject( self,
-                                             &flipboardNavigationControllerKey );
-    return controller;
-}
 @end
