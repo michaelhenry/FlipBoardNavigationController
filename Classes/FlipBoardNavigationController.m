@@ -10,8 +10,8 @@
 #import <QuartzCore/QuartzCore.h>
 
 static const CGFloat kAnimationDuration = 0.5f;
-static const CGFloat kAnimationDelay = 0;
-static const CGFloat kOffsetTrigger = 3.0;
+static const CGFloat kAnimationDelay = 0.0f;
+static const CGFloat kOffsetTrigger = 30.0f;
 static const CGFloat kMaxBlackMaskAlpha = 0.8f;
 
 
@@ -220,7 +220,7 @@ typedef enum {
     
     PanDirection panDirection = PanDirectionNone;
     CGPoint vel = [panGesture velocityInView:self.view];
-    if (vel.x > 0) {
+    if (vel.x > kOffsetTrigger) {
         panDirection = PanDirectionRight;
     } else {
         panDirection = PanDirectionLeft;
