@@ -11,9 +11,7 @@
 
 static const CGFloat kAnimationDuration = 0.5f;
 static const CGFloat kAnimationDelay = 0.0f;
-static const CGFloat kOffsetTrigger = 30.0f;
 static const CGFloat kMaxBlackMaskAlpha = 0.8f;
-
 
 typedef enum {
     PanDirectionNone = 0,
@@ -27,15 +25,21 @@ typedef enum {
     UIView *_blackMask;
     CGPoint _panOrigin;
     BOOL _animationInProgress;
+    CGFloat _percentageOffsetFromLeft;
 }
 
 - (void) addPanGestureToView:(UIView*)view;
-- (CGRect) getSlidingRectForOffset:(CGFloat)offset ;
 - (void) rollBackViewController;
-- (void) completeSlidingAnimationWithDirection:(PanDirection)direction;
 
 - (UIViewController *)currentViewController;
 - (UIViewController *)previousViewController;
+
+- (void) transformAtPercentage:(CGFloat)percentage ;
+- (void) completeSlidingAnimationWithDirection:(PanDirection)direction;
+- (void) completeSlidingAnimationWithOffset:(CGFloat)offset;
+- (CGRect) getSlidingRectWithPercentageOffset:(CGFloat)percentage orientation:(UIInterfaceOrientation)orientation ;
+- (CGRect) viewBoundsWithOrientation:(UIInterfaceOrientation)orientation;
+
 @end
 
 @implementation FlipBoardNavigationController
@@ -53,26 +57,35 @@ typedef enum {
     _blackMask = nil;
 }
 
+#pragma mark - Load View
 - (void) loadView {
     [super loadView];
+    CGRect viewRect = [self viewBoundsWithOrientation:self.interfaceOrientation];
+   
     UIViewController *rootViewController = [self.viewControllers objectAtIndex:0];
     [rootViewController willMoveToParentViewController:self];
     [self addChildViewController:rootViewController];
+   
     UIView * rootView = rootViewController.view;
-    CGSize viewSize = self.view.frame.size;
-    rootView.frame = CGRectMake(0.0f, 0.0f, viewSize.width, viewSize.height);
+    rootView.autoresizingMask = UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth;
+    rootView.frame = viewRect;
     [self.view addSubview:rootView];
+    
     [rootViewController didMoveToParentViewController:self];
-    _blackMask = [[UIView alloc] initWithFrame:CGRectMake(0.0f, 0.0f, viewSize.width, viewSize.height)];
+    _blackMask = [[UIView alloc] initWithFrame:viewRect];
     _blackMask.backgroundColor = [UIColor blackColor];
     _blackMask.alpha = 0.0;
+    _blackMask.autoresizingMask = UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth;
     [self.view insertSubview:_blackMask atIndex:0];
+    self.view.autoresizingMask = UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth;
+    
 }
 
 #pragma mark - PushViewController With Completion Block
 - (void) pushViewController:(UIViewController *)viewController completion:(FlipBoardNavigationControllerCompletionBlock)handler {
     _animationInProgress = YES;
     viewController.view.frame = CGRectOffset(self.view.bounds, self.view.bounds.size.width, 0);
+    viewController.view.autoresizingMask =  UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth;
     _blackMask.alpha = 0.0;
     [viewController willMoveToParentViewController:self];
     [self addChildViewController:viewController];
@@ -137,8 +150,8 @@ typedef enum {
     UIViewController * vc = [self currentViewController];
     UIViewController * nvc = [self previousViewController];
     CGRect rect = CGRectMake(0, 0, vc.view.frame.size.width, vc.view.frame.size.height);
-    self.view.transform = self.view.transform;
-    [UIView animateWithDuration:((vc.view.frame.origin.x *kAnimationDuration)/self.view.frame.size.width) delay:kAnimationDelay options:0 animations:^{
+
+    [UIView animateWithDuration:0.3f delay:kAnimationDelay options:0 animations:^{
         CGAffineTransform transf = CGAffineTransformIdentity;
         nvc.view.transform = CGAffineTransformScale(transf, 0.9f, 0.9f);
         vc.view.frame = rect;
@@ -152,7 +165,12 @@ typedef enum {
 
 - (BOOL)shouldAutorotateToInterfaceOrientation:(UIInterfaceOrientation)interfaceOrientation
 {
+ 
     return (interfaceOrientation == UIInterfaceOrientationPortrait);
+}
+
+- (void) willRotateToInterfaceOrientation:(UIInterfaceOrientation)toInterfaceOrientation duration:(NSTimeInterval)duration {
+
 }
 
 #pragma mark - ChildViewController
@@ -176,6 +194,7 @@ typedef enum {
 #pragma mark - Add Pan Gesture
 - (void) addPanGestureToView:(UIView*)view
 {
+    NSLog(@"ADD PAN GESTURE $$### %i",[_gestures count]);
     UIPanGestureRecognizer* panGesture = [[UIPanGestureRecognizer alloc] initWithTarget:self
                                                                                  action:@selector(gestureRecognizerDidPan:)];
     panGesture.cancelsTouchesInView = YES;
@@ -185,6 +204,11 @@ typedef enum {
     panGesture = nil;
 }
 
+# pragma mark - Avoid Unwanted Vertical Gesture
+- (BOOL)gestureRecognizerShouldBegin:(UIPanGestureRecognizer *)panGestureRecognizer {
+    CGPoint translation = [panGestureRecognizer translationInView:self.view];
+    return fabs(translation.x) > fabs(translation.y) ;
+}
 
 #pragma mark - Gesture recognizer
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceiveTouch:(UITouch *)touch {
@@ -198,40 +222,52 @@ typedef enum {
     return YES;
 }
 
-
+#pragma mark - Handle Panning Activity
 - (void) gestureRecognizerDidPan:(UIPanGestureRecognizer*)panGesture {
     if(_animationInProgress) return;
+ 
     CGPoint currentPoint = [panGesture translationInView:self.view];
     CGFloat x = currentPoint.x + _panOrigin.x;
-    CGFloat offset = 0;
-    
-    UIViewController * vc ;
-    vc = [self currentViewController];
-    offset = CGRectGetWidth(vc.view.frame) - x;
-    vc.view.frame = [self getSlidingRectForOffset:offset];
-    
-    CGAffineTransform transf = CGAffineTransformIdentity;
-    CGFloat newTransformValue =  1 - (offset/(self.view.frame.size.width/10))/100;
-    CGFloat newAlphaValue = (offset/self.view.frame.size.width)* kMaxBlackMaskAlpha;
-    
-    [self previousViewController].view.transform = CGAffineTransformScale(transf,newTransformValue,newTransformValue);
-    
-    _blackMask.alpha = newAlphaValue;
     
     PanDirection panDirection = PanDirectionNone;
     CGPoint vel = [panGesture velocityInView:self.view];
-    if (vel.x > kOffsetTrigger) {
+
+    if (vel.x > 0) {
         panDirection = PanDirectionRight;
     } else {
         panDirection = PanDirectionLeft;
     }
     
+    CGFloat offset = 0;
+    
+    UIViewController * vc ;
+    vc = [self currentViewController];
+    offset = CGRectGetWidth(vc.view.frame) - x;
+    
+    _percentageOffsetFromLeft = offset/[self viewBoundsWithOrientation:self.interfaceOrientation].size.width;
+    vc.view.frame = [self getSlidingRectWithPercentageOffset:_percentageOffsetFromLeft orientation:self.interfaceOrientation];
+    [self transformAtPercentage:_percentageOffsetFromLeft];
+    
     if (panGesture.state == UIGestureRecognizerStateEnded || panGesture.state == UIGestureRecognizerStateCancelled) {
-        [self completeSlidingAnimationWithDirection:panDirection];
+        // If velocity is greater than 100 the Execute the Completion base on pan direction
+        if(abs(vel.x) > 100) {
+            [self completeSlidingAnimationWithDirection:panDirection];
+        }else { 
+            [self completeSlidingAnimationWithOffset:offset];
+        }
     }
 }
 
-// This will complete the animation base on pan direction
+#pragma mark - Set the required transformation based on percentage
+- (void) transformAtPercentage:(CGFloat)percentage {
+    CGAffineTransform transf = CGAffineTransformIdentity;
+    CGFloat newTransformValue =  1 - (percentage*10)/100;
+    CGFloat newAlphaValue = percentage* kMaxBlackMaskAlpha;
+    [self previousViewController].view.transform = CGAffineTransformScale(transf,newTransformValue,newTransformValue);
+    _blackMask.alpha = newAlphaValue;
+}
+
+#pragma mark - This will complete the animation base on pan direction
 - (void) completeSlidingAnimationWithDirection:(PanDirection)direction {
     if(direction==PanDirectionRight){
         [self popViewController];
@@ -240,19 +276,45 @@ typedef enum {
     }
 }
 
-// Get the current position for the visible viewcontrollers
-- (CGRect) getSlidingRectForOffset:(CGFloat)offset {
-    
+#pragma mark - This will complete the animation base on offset
+- (void) completeSlidingAnimationWithOffset:(CGFloat)offset{
+   
+    if(offset<[self viewBoundsWithOrientation:self.interfaceOrientation].size.width/2) {
+         [self popViewController];
+    }else {
+        [self rollBackViewController];
+    }
+}
+
+#pragma mark - Get the origin and size of the visible viewcontrollers(child)
+- (CGRect) getSlidingRectWithPercentageOffset:(CGFloat)percentage orientation:(UIInterfaceOrientation)orientation {
+    CGRect viewRect = [self viewBoundsWithOrientation:orientation];
     CGRect rectToReturn = CGRectZero;
     UIViewController * vc;
     vc = [self currentViewController];
-    rectToReturn.size = vc.view.frame.size;
-    CGFloat width = CGRectGetWidth(vc.view.frame);
-    rectToReturn.origin = CGPointMake(MIN(MAX(width-offset,0),vc.view.frame.size.width), 0.0);
+    rectToReturn.size = viewRect.size;
+    rectToReturn.origin = CGPointMake(MAX(0,(1-percentage)*viewRect.size.width), 0.0);
     return rectToReturn;
 }
 
+#pragma mark - Get the size of view in the main screen
+- (CGRect) viewBoundsWithOrientation:(UIInterfaceOrientation)orientation{
+	CGRect bounds = [UIScreen mainScreen].bounds;
+    if([[UIApplication sharedApplication]isStatusBarHidden]){
+        return bounds;
+    } else if(UIInterfaceOrientationIsLandscape(orientation)){
+		CGFloat width = bounds.size.width;
+		bounds.size.width = bounds.size.height;
+		bounds.size.height = width - 20;
+        return bounds;
+	}else{
+        bounds.size.height-=20;
+        return bounds;
+    }
+}
+
 @end
+
 
 
 #pragma mark - UIViewController Category
@@ -275,5 +337,6 @@ typedef enum {
     }
     
 }
+
 
 @end
