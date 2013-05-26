@@ -118,8 +118,10 @@ typedef enum {
     if (self.viewControllers.count < 2) {
         return;
     }
+    
     UIViewController *currentVC = [self currentViewController];
     UIViewController *previousVC = [self previousViewController];
+    [previousVC viewWillAppear:NO];
     [UIView animateWithDuration:kAnimationDuration delay:kAnimationDelay options:0 animations:^{
         currentVC.view.frame = CGRectOffset(self.view.bounds, self.view.bounds.size.width, 0);
         CGAffineTransform transf = CGAffineTransformIdentity;
@@ -134,6 +136,7 @@ typedef enum {
             [currentVC didMoveToParentViewController:nil];
             [self.viewControllers removeObject:currentVC];
             _animationInProgress = NO;
+            [previousVC viewDidAppear:NO];
             handler();
         }
     }];
