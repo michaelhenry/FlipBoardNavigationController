@@ -130,6 +130,7 @@ typedef enum {
         _blackMask.alpha = 0.0;
     } completion:^(BOOL finished) {
         if (finished) {
+            [currentVC.view removeFromSuperview];
             [currentVC willMoveToParentViewController:nil];
             [self.view bringSubviewToFront:[self previousViewController].view];
             [currentVC removeFromParentViewController];
