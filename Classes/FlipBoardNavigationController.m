@@ -28,6 +28,9 @@
 #import "FlipBoardNavigationController.h"
 #import <QuartzCore/QuartzCore.h>
 
+#define SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(v)  ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] != NSOrderedAscending)
+
+
 static const CGFloat kAnimationDuration = 0.5f;
 static const CGFloat kAnimationDelay = 0.0f;
 static const CGFloat kMaxBlackMaskAlpha = 0.8f;
@@ -89,7 +92,6 @@ typedef enum {
     rootView.autoresizingMask = UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth;
     rootView.frame = viewRect;
     [self.view addSubview:rootView];
-    
     [rootViewController didMoveToParentViewController:self];
     _blackMask = [[UIView alloc] initWithFrame:viewRect];
     _blackMask.backgroundColor = [UIColor blackColor];
@@ -97,7 +99,7 @@ typedef enum {
     _blackMask.autoresizingMask = UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth;
     [self.view insertSubview:_blackMask atIndex:0];
     self.view.autoresizingMask = UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth;
-    
+    self.view.backgroundColor = [UIColor greenColor];
 }
 
 #pragma mark - PushViewController With Completion Block
@@ -328,10 +330,16 @@ typedef enum {
     } else if(UIInterfaceOrientationIsLandscape(orientation)){
 		CGFloat width = bounds.size.width;
 		bounds.size.width = bounds.size.height;
-		bounds.size.height = width - 20;
+        if (!SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"7.0"))  {
+            bounds.size.height = width - 20;
+        }else {
+            bounds.size.height = width;
+        }
         return bounds;
 	}else{
-        bounds.size.height-=20;
+        if (!SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"7.0"))  {
+            bounds.size.height-=20;
+        }
         return bounds;
     }
 }
