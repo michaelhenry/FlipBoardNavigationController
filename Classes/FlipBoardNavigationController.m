@@ -99,7 +99,6 @@ typedef enum {
     _blackMask.autoresizingMask = UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth;
     [self.view insertSubview:_blackMask atIndex:0];
     self.view.autoresizingMask = UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth;
-    self.view.backgroundColor = [UIColor greenColor];
 }
 
 #pragma mark - PushViewController With Completion Block
